@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Huffman Tree Visualizer</title>
+    <style>
+        .card {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        .card-header {
+            margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .space-y-4 > * + * {
+            margin-top: 1rem;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        .text-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .overflow-x-auto {
+            overflow-x: auto;
+        }
+        .codes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .code-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            background-color: #f3f4f6;
+            border-radius: 4px;
+        }
+        .font-mono {
+            font-family: monospace;
+        }
+        .encoding-result {
+            margin-top: 20px;
+            border: 1px solid #e5e7eb;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #f9fafb;
+        }
+        .result-label {
+            font-weight: 500;
+            min-width: 120px;
+        }
+        .result-content {
+            font-family: monospace;
+            word-break: break-all;
+            flex-grow: 1;
+            margin: 0 20px;
+        }
+        .result-size {
+            font-family: monospace;
+            min-width: 80px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Huffman Tree Visualizer</h2>
+        </div>
+        <div class="space-y-4">
+            <div class="input-group">
+                <label class="input-label">입력 텍스트:</label>
+                <input 
+                    type="text" 
+                    id="textInput"
+                    class="text-input"
+                    placeholder="텍스트를 입력하세요"
+                />
+            </div>
+
+            <div id="encodingResult" class="encoding-result" style="display: none;">
+                <div class="result-row">
+                    <span class="result-label">입력 텍스트</span>
+                    <span id="inputText" class="result-content"></span>
+                    <span id="inputSize" class="result-size"></span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">압축 결과</span>
+                    <span id="compressedText" class="result-content"></span>
+                    <span id="compressedSize" class="result-size"></span>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <svg id="treeVisualization" width="800" height="400" style="background: white;">
+                </svg>
+            </div>
+
+            <div id="codesContainer" style="display: none;">
+                <h3 style="font-weight: 500; margin-bottom: 8px;">Huffman 코드:</h3>
+                <div id="codesGrid" class="codes-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class HuffmanNode {
+            constructor(data, frequency) {
+                this.data = data;
+                this.frequency = frequency;
+                this.left = null;
+                this.right = null;
+            }
+        }
+
+        function calculateFrequencies(text) {
+            const freq = {};
+            for (let char of text) {
+                freq[char] = (freq[char] || 0) + 1;
+            }
+            return freq;
+        }
+
+        function buildHuffmanTree(frequencies) {
+            const nodes = Object.entries(frequencies).map(([char, freq]) => 
+                new HuffmanNode(char, freq)
+            );
+
+            while (nodes.length > 1) {
+                nodes.sort((a, b) => a.frequency - b.frequency);
+                const left = nodes.shift();
+                const right = nodes.shift();
+                const parent = new HuffmanNode('$', left.frequency + right.frequency);
+                parent.left = left;
+                parent.right = right;
+                nodes.push(parent);
+            }
+
+            return nodes[0];
+        }
+
+        function generateCodes(node, code = '', codes = {}) {
+            if (!node) return codes;
+            
+            if (!node.left && !node.right) {
+                codes[node.data] = code;
+            }
+            
+            generateCodes(node.left, code + '0', codes);
+            generateCodes(node.right, code + '1', codes);
+            
+            return codes;
+        }
+
+        function getTreeDepth(node) {
+            if (!node) return 0;
+            return 1 + Math.max(getTreeDepth(node.left), getTreeDepth(node.right));
+        }
+
+        function createSvgElement(type) {
+            return document.createElementNS("http://www.w3.org/2000/svg", type);
+        }
+
+        function drawNode(svg, data, frequency, x, y, isLeaf) {
+            const g = createSvgElement('g');
+            g.setAttribute('transform', `translate(${x},${y})`);
+
+            const circle = createSvgElement('circle');
+            circle.setAttribute('r', '20');
+            circle.setAttribute('fill', isLeaf ? '#93c5fd' : '#e5e7eb');
+            circle.setAttribute('stroke', '#1e40af');
+            circle.setAttribute('stroke-width', '2');
+            g.appendChild(circle);
+
+            const text1 = createSvgElement('text');
+            text1.setAttribute('text-anchor', 'middle');
+            text1.setAttribute('y', '-5');
+            text1.setAttribute('font-size', '12px');
+            text1.setAttribute('font-weight', 'bold');
+            text1.textContent = data === '$' ? 'sum' : data;
+            g.appendChild(text1);
+
+            const text2 = createSvgElement('text');
+            text2.setAttribute('text-anchor', 'middle');
+            text2.setAttribute('y', '10');
+            text2.setAttribute('font-size', '12px');
+            text2.textContent = frequency;
+            g.appendChild(text2);
+
+            svg.appendChild(g);
+        }
+
+        function drawEdge(svg, x1, y1, x2, y2, label) {
+            const g = createSvgElement('g');
+
+            const line = createSvgElement('line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('stroke', '#1e40af');
+            line.setAttribute('stroke-width', '2');
+            g.appendChild(line);
+
+            const text = createSvgElement('text');
+            text.setAttribute('x', (x1 + x2) / 2);
+            text.setAttribute('y', (y1 + y2) / 2 - 5);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('font-size', '12px');
+            text.textContent = label;
+            g.appendChild(text);
+
+            svg.appendChild(g);
+        }
+
+        function renderTree(node, level, x, y, gap, svg) {
+            if (!node) return;
+
+            drawNode(svg, node.data, node.frequency, x, y, !node.left && !node.right);
+
+            if (node.left) {
+                const childX = x - gap;
+                const childY = y + 80;
+                drawEdge(svg, x, y + 20, childX, childY - 20, '0');
+                renderTree(node.left, level + 1, childX, childY, gap / 2, svg);
+            }
+
+            if (node.right) {
+                const childX = x + gap;
+                const childY = y + 80;
+                drawEdge(svg, x, y + 20, childX, childY - 20, '1');
+                renderTree(node.right, level + 1, childX, childY, gap / 2, svg);
+            }
+        }
+
+        function displayCodes(codes) {
+            const container = document.getElementById('codesContainer');
+            const grid = document.getElementById('codesGrid');
+            grid.innerHTML = '';
+
+            Object.entries(codes).forEach(([char, code]) => {
+                const item = document.createElement('div');
+                item.className = 'code-item';
+                item.innerHTML = `
+                    <span class="font-mono">'${char}'</span>
+                    <span class="font-mono">${code}</span>
+                `;
+                grid.appendChild(item);
+            });
+
+            container.style.display = 'block';
+        }
+
+        function encodeText(text, codes) {
+            return text.split('').map(char => codes[char]).join('');
+        }
+
+        function updateVisualization(text) {
+            if (!text) {
+                document.getElementById('codesContainer').style.display = 'none';
+                document.getElementById('encodingResult').style.display = 'none';
+                const svg = document.getElementById('treeVisualization');
+                svg.innerHTML = '';
+                return;
+            }
+
+            const frequencies = calculateFrequencies(text);
+            const tree = buildHuffmanTree(frequencies);
+            const codes = generateCodes(tree);
+            const treeDepth = getTreeDepth(tree);
+
+            const svg = document.getElementById('treeVisualization');
+            svg.innerHTML = '';
+            const svgWidth = Math.max(800, Math.pow(2, treeDepth) * 100);
+            const svgHeight = treeDepth * 100 + 50;
+            svg.setAttribute('width', svgWidth);
+            svg.setAttribute('height', svgHeight);
+
+            renderTree(tree, 0, svgWidth / 2, 40, svgWidth / 5, svg);
+            displayCodes(codes);
+
+            const encodedText = encodeText(text, codes);
+            document.getElementById('encodingResult').style.display = 'block';
+            document.getElementById('inputText').textContent = text;
+            document.getElementById('inputSize').textContent = `${text.length * 8} bits`;
+            document.getElementById('compressedText').textContent = encodedText;
+            document.getElementById('compressedSize').textContent = `${encodedText.length} bits`;
+        }
+
+        document.getElementById('textInput').addEventListener('input', (e) => {
+            updateVisualization(e.target.value);
+        });
+    </script>
+</body>
+</html>
