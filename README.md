@@ -18,9 +18,11 @@
 - **Jung Hyein**
   - Final Presentation
 
+
 ---
 
 # Huffman code-based program introduction
+---
  
 ## (1) Windows Text Compression Program (.C)
 
